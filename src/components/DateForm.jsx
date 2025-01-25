@@ -1,15 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Form, Button, Alert } from 'react-bootstrap';
-import '../styles/DateForm.css'
+import '../styles/DateForm.css';
+
+const initialFormState = {
+  name: '',
+  date: '',
+  time: '',
+  rut: '',
+  specialty: '',
+};
+
+const TIME_SLOTS = {
+  Mañana: ['09:00', '10:00', '11:00'],
+  Tarde: ['15:00', '16:00', '17:00'],
+};
 
 const DateForm = ({ onSubmit }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    date: '',
-    time: '',
-    rut: '',
-    specialty: '',
-  });
+  const [formData, setFormData] = useState(initialFormState);
   const [error, setError] = useState('');
   const nameInputRef = useRef(null);
 
@@ -19,51 +26,61 @@ const DateForm = ({ onSubmit }) => {
     }
   }, []);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const validateForm = useCallback(() => {
+    const { name, date, time, rut, specialty } = formData;
 
-    if (!formData.name || !formData.date || !formData.time || !formData.rut || !formData.specialty) {
-      setError('Todos los campos son obligatorios.');
-      return;
+    if (!name || !date || !time || !rut || !specialty) {
+      return 'Todos los campos son obligatorios.';
     }
 
     const rucRegex = /^\d{11}$/;
-    if (!rucRegex.test(formData.rut)) {
-      setError('El RUT debe tener 11 dígitos.');
-      return;
+    if (!rucRegex.test(rut)) {
+      return 'El RUT debe tener 11 dígitos.';
     }
 
-    const today = new Date().toISOString().split('T')[0]; 
-    if (formData.date < today) {
-      setError('La fecha no puede ser anterior a hoy.');
+    const today = new Date().toISOString().split('T')[0];
+    if (date < today) {
+      return 'La fecha no puede ser anterior a hoy.';
+    }
+
+    return ''; // Sin errores
+  }, [formData]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setError('');
-    onSubmit(formData); 
-    setFormData({
-      name: '',
-      date: '',
-      time: '',
-      rut: '',
-      specialty: '',
-    });
+    onSubmit(formData);
+    setFormData(initialFormState);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
-    <div className='contenedorCita'>
-         <h1 className='citaTitle'>Agenda tu cita:</h1>
-         <br />
+    <div className="contenedorCita">
+      <h1 className="citaTitle">Agenda tu cita:</h1>
+      <br />
       <Form onSubmit={handleSubmit}>
         {/* Nombre */}
         <Form.Group className="mb-3" controlId="formName">
           <Form.Label>Nombre</Form.Label>
           <Form.Control
             type="text"
+            name="name"
             ref={nameInputRef}
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={handleInputChange}
             placeholder="Ingresa tu nombre"
+            aria-label="Nombre completo"
           />
         </Form.Group>
 
@@ -72,45 +89,47 @@ const DateForm = ({ onSubmit }) => {
           <Form.Label>Fecha</Form.Label>
           <Form.Control
             type="date"
+            name="date"
             value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            min={new Date().toISOString().split('T')[0]} 
+            onChange={handleInputChange}
+            min={new Date().toISOString().split('T')[0]}
+            aria-label="Fecha de la cita"
           />
         </Form.Group>
 
-        {/* Hora (turnos predefinidos) */}
+        {/* Hora */}
         <Form.Group className="mb-3" controlId="formTime">
           <Form.Label>Hora</Form.Label>
           <Form.Control
             as="select"
+            name="time"
             value={formData.time}
-            onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+            onChange={handleInputChange}
+            aria-label="Hora de la cita"
           >
             <option value="">Selecciona un turno</option>
-            {/* Turnos de la mañana */}
-            <optgroup label="Mañana">
-              <option value="09:00">09:00 AM</option>
-              <option value="10:00">10:00 AM</option>
-              <option value="11:00">11:00 AM</option>
-            </optgroup>
-
-            {/* Turnos de la tarde */}
-            <optgroup label="Tarde">
-              <option value="03:00">03:00 PM</option>
-              <option value="04:00">04:00 PM</option>
-              <option value="05:00">05:00 PM</option>
-            </optgroup>
+            {Object.entries(TIME_SLOTS).map(([period, times]) => (
+              <optgroup key={period} label={period}>
+                {times.map((time) => (
+                  <option key={time} value={time}>
+                    {time}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </Form.Control>
         </Form.Group>
 
-        {/* RUC */}
+        {/* RUT */}
         <Form.Group className="mb-3" controlId="formRut">
           <Form.Label>RUT</Form.Label>
           <Form.Control
             type="text"
+            name="rut"
             value={formData.rut}
-            onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
+            onChange={handleInputChange}
             placeholder="Ingresa tu RUT (11 dígitos)"
+            aria-label="RUT del usuario"
           />
         </Form.Group>
 
@@ -119,8 +138,10 @@ const DateForm = ({ onSubmit }) => {
           <Form.Label>Especialidad</Form.Label>
           <Form.Control
             as="select"
+            name="specialty"
             value={formData.specialty}
-            onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+            onChange={handleInputChange}
+            aria-label="Especialidad médica"
           >
             <option value="">Selecciona una especialidad</option>
             <option value="Cardiología">Cardiología</option>
